@@ -26,7 +26,24 @@ export class Game extends Phaser.Scene {
   private moveHoldTime: number = 0;
   private moveDirection: number = 0;
   private readonly MAX_MOVE_STEP: number = 120;
-  private cargoBoxes: Phaser.GameObjects.Container[] = [];
+  private particles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private scorePopups: Phaser.GameObjects.Text[] = [];
+  private consecutiveCorrect: number = 0;
+  private comboMultiplier: number = 1;
+  private comboText!: Phaser.GameObjects.Text;
+  private sparkParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private smallFireParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private mediumFireParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private bigFireParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private hugeFireParticles!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private powerUps!: Phaser.Physics.Arcade.Group;
+  private isInvincible: boolean = false;
+  private shieldTimer: number = 0;
+  private shieldEffect!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private shieldText!: Phaser.GameObjects.Text;
+  private spaceships!: Phaser.GameObjects.Group;
+  private spaceshipTrails!: Phaser.GameObjects.Particles.ParticleEmitter;
+  private activeTrails: Phaser.GameObjects.Particles.ParticleEmitter[] = [];
 
   constructor() {
     super({ key: 'Game' });
@@ -41,6 +58,143 @@ export class Game extends Phaser.Scene {
     // Create scrolling background
     this.background = this.add.tileSprite(400, 300, 800, 600, 'road');
     
+    // Create particle textures
+    this.createParticleTexture();
+    this.createFireParticleTextures();
+    this.createShieldTexture();
+    this.createSpaceshipTexture();
+    
+    // Create spaceship group with physics enabled
+    this.spaceships = this.physics.add.group();
+    
+    // Create spaceship trail particles
+    this.spaceshipTrails = this.add.particles(0, 0, 'particle', {
+      speed: { min: 20, max: 40 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.4, end: 0 },
+      lifespan: 800,
+      quantity: 1,
+      emitting: false,
+      alpha: { start: 0.6, end: 0 },
+      blendMode: 'ADD',
+      tint: [0x00ffff, 0x0088ff]
+    });
+
+    // Create shield effect particles
+    this.shieldEffect = this.add.particles(0, 0, 'shield', {
+      speed: { min: 20, max: 40 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.6, end: 0 },
+      lifespan: 1000,
+      quantity: 2,
+      emitting: false,
+      alpha: { start: 0.6, end: 0 },
+      blendMode: 'ADD',
+      tint: [0x00ffff, 0x0088ff]
+    });
+
+    // Create shield text
+    this.shieldText = this.add.text(16, 96, '', { 
+      fontSize: '24px', 
+      color: '#00ffff',
+      stroke: '#000000',
+      strokeThickness: 4
+    });
+
+    // Create power-ups group
+    this.powerUps = this.physics.add.group();
+
+    // Create particle emitters
+    this.particles = this.add.particles(0, 0, 'particle', {
+      speed: { min: 100, max: 200 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.8, end: 0 },
+      lifespan: 1000,
+      gravityY: 300,
+      quantity: 20,
+      emitting: false,
+      tint: [0x00ff00, 0x00ffff, 0xffff00]
+    });
+
+    // Create combo text
+    this.comboText = this.add.text(16, 56, '', { 
+      fontSize: '24px', 
+      color: '#ffff00',
+      stroke: '#000000',
+      strokeThickness: 4
+    });
+
+    // Create spark particles
+    this.sparkParticles = this.add.particles(0, 0, 'spark', {
+      speed: { min: 50, max: 100 },
+      angle: { min: 0, max: 360 },
+      scale: { start: 0.4, end: 0 },
+      lifespan: 500,
+      quantity: 15,
+      emitting: false,
+      tint: [0xffff00, 0xffaa00]
+    });
+
+    // Create small flame particles
+    this.smallFireParticles = this.add.particles(0, 0, 'flame', {
+      speed: { min: 20, max: 40 },
+      angle: { min: -20, max: 20 },
+      scale: { start: 0.8, end: 0 },
+      lifespan: 600,
+      quantity: 12,
+      emitting: false,
+      alpha: { start: 1, end: 0 },
+      rotate: { min: -10, max: 10 },
+      gravityY: -50,
+      blendMode: 'ADD',
+      tint: [0xffff00, 0xff4400]
+    });
+
+    // Create medium flame particles
+    this.mediumFireParticles = this.add.particles(0, 0, 'flame', {
+      speed: { min: 30, max: 60 },
+      angle: { min: -30, max: 30 },
+      scale: { start: 1, end: 0 },
+      lifespan: 800,
+      quantity: 20,
+      emitting: false,
+      alpha: { start: 1, end: 0 },
+      rotate: { min: -15, max: 15 },
+      gravityY: -70,
+      blendMode: 'ADD',
+      tint: [0xffff00, 0xff4400]
+    });
+
+    // Create big flame particles
+    this.bigFireParticles = this.add.particles(0, 0, 'flame', {
+      speed: { min: 40, max: 80 },
+      angle: { min: -40, max: 40 },
+      scale: { start: 1.2, end: 0 },
+      lifespan: 1000,
+      quantity: 30,
+      emitting: false,
+      alpha: { start: 1, end: 0 },
+      rotate: { min: -20, max: 20 },
+      gravityY: -90,
+      blendMode: 'ADD',
+      tint: [0xffff00, 0xff4400]
+    });
+
+    // Create huge flame particles
+    this.hugeFireParticles = this.add.particles(0, 0, 'flame', {
+      speed: { min: 50, max: 100 },
+      angle: { min: -50, max: 50 },
+      scale: { start: 1.5, end: 0 },
+      lifespan: 1200,
+      quantity: 40,
+      emitting: false,
+      alpha: { start: 1, end: 0 },
+      rotate: { min: -25, max: 25 },
+      gravityY: -110,
+      blendMode: 'ADD',
+      tint: [0xffff00, 0xff4400]
+    });
+
     // Create player (green circle)
     const playerGraphics = this.add.graphics();
     playerGraphics.fillStyle(0x00ff00, 1);
@@ -80,34 +234,6 @@ export class Game extends Phaser.Scene {
     // Create start banner
     this.createStartBanner();
 
-    // Only add animated cargo shipment boxes on the dividers (max 4 per divider)
-    this.cargoBoxes = [];
-    const boxColors = [0xffa500, 0x00bfff, 0x8a2be2, 0x32cd32, 0xff69b4, 0xff6347];
-    const boxDividers = [200, 400];
-    boxDividers.forEach((y, dividerIdx) => {
-      let x = 120;
-      for (let i = 0; i < 4; i++) {
-        let color = boxColors[i % boxColors.length];
-        const width = Phaser.Math.Between(36, 60);
-        const height = Phaser.Math.Between(28, 40);
-        // Only create rectangular cargo boxes
-        const base = this.add.rectangle(0, 0, width, height, color, 1);
-        const top = this.add.rectangle(0, -height / 2, width, 10, Phaser.Display.Color.GetColor(
-          Math.min(255, (color >> 16) + 40),
-          Math.min(255, ((color >> 8) & 0xff) + 40),
-          Math.min(255, (color & 0xff) + 40)
-        ), 0.8);
-        const side = this.add.rectangle(width / 2, 0, 8, height, Phaser.Display.Color.GetColor(
-          Math.max(0, (color >> 16) - 40),
-          Math.max(0, ((color >> 8) & 0xff) - 40),
-          Math.max(0, (color & 0xff) - 40)
-        ), 0.8);
-        const box = this.add.container(x, y - height / 2, [base, top, side]);
-        this.cargoBoxes.push(box);
-        x += width + Phaser.Math.Between(80, 140);
-      }
-    });
-
     // Setup collisions
     this.physics.add.overlap(
       this.player,
@@ -116,32 +242,67 @@ export class Game extends Phaser.Scene {
         if (obstacle instanceof Phaser.Physics.Arcade.Sprite) {
           if (obstacle.getData('isCorrect')) {
             // Correct answer
-            this.score += 10;
+            const baseScore = 10;
+            const finalScore = Math.floor(baseScore * this.comboMultiplier);
+            this.score += finalScore;
             this.scoreText.setText(`Score: ${this.score}`);
             const text = obstacle.getData('text');
             if (text) text.destroy();
-            obstacle.destroy();
-            this.spawnNewProblem(); // Spawn new problem immediately after correct answer
-          } else {
-            // Wrong answer - Game Over
-            this.gameOver = true;
-            this.physics.pause();
-            this.player.setTint(0xff0000);
-            this.add.text(400, 300, 'Game Over', { fontSize: '64px', color: '#fff' }).setOrigin(0.5);
             
-            // Add restart button
-            this.restartButton = this.add.text(400, 400, 'Press SPACE to Restart', { 
-              fontSize: '32px', 
-              color: '#fff', 
-              backgroundColor: '#222' 
-            }).setOrigin(0.5);
+            // Emit particles at the obstacle's position
+            this.particles.setPosition(obstacle.x, obstacle.y);
+            this.particles.explode();
+            
+            // Create score popup with multiplier
+            this.createScorePopup(obstacle.x, obstacle.y, finalScore);
+            
+            // Update combo
+            this.updateCombo(true);
+            
+            obstacle.destroy();
+            this.spawnNewProblem();
+          } else {
+            // Wrong answer - Game Over (unless invincible)
+            if (!this.isInvincible) {
+              this.updateCombo(false);
+              this.gameOver = true;
+              this.physics.pause();
+              this.player.setTint(0xff0000);
+              this.add.text(400, 300, 'Game Over', { fontSize: '64px', color: '#fff' }).setOrigin(0.5);
+              
+              // Add restart button
+              this.restartButton = this.add.text(400, 400, 'Press SPACE to Restart', { 
+                fontSize: '32px', 
+                color: '#fff', 
+                backgroundColor: '#222' 
+              }).setOrigin(0.5);
 
-            // Add space key listener for restart
-            if (this.input.keyboard) {
-              this.input.keyboard.once('keydown-SPACE', () => {
-                this.scene.restart();
-              });
+              // Add space key listener for restart
+              if (this.input.keyboard) {
+                this.input.keyboard.once('keydown-SPACE', () => {
+                  this.scene.restart();
+                });
+              }
+            } else {
+              // If invincible, just destroy the obstacle
+              const text = obstacle.getData('text');
+              if (text) text.destroy();
+              obstacle.destroy();
             }
+          }
+        }
+      }) as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback
+    );
+
+    // Add power-up collision
+    this.physics.add.overlap(
+      this.player,
+      this.powerUps,
+      ((player: Phaser.Physics.Arcade.GameObjectWithBody, powerUp: Phaser.Physics.Arcade.GameObjectWithBody) => {
+        if (powerUp instanceof Phaser.Physics.Arcade.Sprite) {
+          if (powerUp.getData('type') === 'shield') {
+            this.activateShield();
+            powerUp.destroy();
           }
         }
       }) as Phaser.Types.Physics.Arcade.ArcadePhysicsCallback
@@ -259,34 +420,260 @@ export class Game extends Phaser.Scene {
     // Determine correct answer lane
     const correctLane = Phaser.Math.Between(0, 2);
     const correctAnswer = this.currentProblem ? this.currentProblem.getAnswer() : 0;
-    const wrongAnswers = [correctAnswer + 1, correctAnswer - 1];
+    
+    // Generate wrong answers that are different from the correct answer
+    let wrongAnswers: number[] = [];
+    while (wrongAnswers.length < 2) {
+      const wrongAnswer = correctAnswer + Phaser.Math.Between(-5, 5);
+      if (wrongAnswer !== correctAnswer && !wrongAnswers.includes(wrongAnswer)) {
+        wrongAnswers.push(wrongAnswer);
+      }
+    }
 
     // Calculate the rightmost obstacle's position
     const rightmostObstacle = this.obstacles.getChildren().reduce((maxX: number, obstacle: any) => {
       return Math.max(maxX, obstacle.x);
     }, 0);
 
-    // Spawn obstacles with answers
-    for (let i = 0; i < 3; i++) {
-      const answer = i === correctLane ? correctAnswer : wrongAnswers[i > correctLane ? 1 : 0];
-      const obstacle = this.obstacles.create(
-        Math.max(800, rightmostObstacle + this.OBSTACLE_SPACING), // Ensure minimum spacing
-        this.lanes[i],
-        'obstacle'
-      ) as Phaser.Physics.Arcade.Sprite;
-      obstacle.setData('answer', answer);
-      obstacle.setData('isCorrect', i === correctLane);
-      // Add answer text above obstacle
-      const answerText = this.add.text(obstacle.x, obstacle.y - 30, answer.toString(), {
-        fontSize: '24px',
-        color: '#fff',
-        backgroundColor: '#000'
-      }).setOrigin(0.5);
-      obstacle.setData('text', answerText);
-      obstacle.setVelocityX(-this.speed); // Move from right to left
-      // Randomize animation type
-      const animType = Phaser.Math.RND.pick(['bob', 'rotate', 'pulse']);
-      obstacle.setData('animType', animType);
+    // Only spawn if there's enough space
+    if (rightmostObstacle < 600) {
+      // Spawn obstacles with answers
+      for (let i = 0; i < 3; i++) {
+        const answer = i === correctLane ? correctAnswer : wrongAnswers[i > correctLane ? 1 : 0];
+        const obstacle = this.obstacles.create(
+          Math.max(800, rightmostObstacle + this.OBSTACLE_SPACING),
+          this.lanes[i],
+          'obstacle'
+        ) as Phaser.Physics.Arcade.Sprite;
+        obstacle.setData('answer', answer);
+        obstacle.setData('isCorrect', i === correctLane);
+        // Add answer text above obstacle
+        const answerText = this.add.text(obstacle.x, obstacle.y - 30, answer.toString(), {
+          fontSize: '24px',
+          color: '#fff',
+          backgroundColor: '#000'
+        }).setOrigin(0.5);
+        obstacle.setData('text', answerText);
+        obstacle.setVelocityX(-this.speed); // Move from right to left
+        // Randomize animation type
+        const animType = Phaser.Math.RND.pick(['bob', 'rotate', 'pulse']);
+        obstacle.setData('animType', animType);
+      }
+    }
+  }
+
+  private createParticleTexture() {
+    const graphics = this.add.graphics();
+    graphics.fillStyle(0xffffff, 1);
+    graphics.fillCircle(4, 4, 4);
+    graphics.generateTexture('particle', 8, 8);
+    graphics.destroy();
+  }
+
+  private createFireParticleTextures() {
+    // Create spark texture
+    const sparkGraphics = this.add.graphics();
+    sparkGraphics.fillStyle(0xffffff, 1);
+    sparkGraphics.fillCircle(2, 2, 2);
+    sparkGraphics.generateTexture('spark', 4, 4);
+    sparkGraphics.destroy();
+
+    // Create flame texture
+    const flameGraphics = this.add.graphics();
+    flameGraphics.fillStyle(0xffffff, 1);
+    flameGraphics.fillTriangle(0, 0, 8, 0, 4, 12);
+    flameGraphics.generateTexture('flame', 8, 12);
+    flameGraphics.destroy();
+  }
+
+  private createShieldTexture() {
+    const shieldGraphics = this.add.graphics();
+    shieldGraphics.lineStyle(2, 0x00ffff, 1);
+    shieldGraphics.fillStyle(0x00ffff, 0.3);
+    shieldGraphics.fillCircle(8, 8, 8);
+    shieldGraphics.strokeCircle(8, 8, 8);
+    shieldGraphics.generateTexture('shield', 16, 16);
+    shieldGraphics.destroy();
+  }
+
+  private createSpaceshipTexture() {
+    const shipGraphics = this.add.graphics();
+    
+    // Draw spaceship body
+    shipGraphics.fillStyle(0x00ffff, 1);
+    shipGraphics.fillTriangle(0, 0, 16, 8, 0, 16);
+    
+    // Draw spaceship details
+    shipGraphics.lineStyle(1, 0xffffff, 1);
+    shipGraphics.strokeTriangle(0, 0, 16, 8, 0, 16);
+    shipGraphics.lineBetween(4, 4, 12, 8);
+    shipGraphics.lineBetween(4, 12, 12, 8);
+    
+    // Draw engine glow
+    shipGraphics.fillStyle(0x00ffff, 0.6);
+    shipGraphics.fillCircle(16, 8, 3);
+    
+    shipGraphics.generateTexture('spaceship', 20, 20);
+    shipGraphics.destroy();
+  }
+
+  private activateShield() {
+    this.isInvincible = true;
+    this.shieldTimer = 7000; // 7 seconds
+    this.shieldText.setText(''); // Remove timer text
+    
+    // Create shield effect around player with full intensity
+    this.shieldEffect.setPosition(this.player.x, this.player.y);
+    this.shieldEffect.start();
+    this.shieldEffect.setAlpha(0.6); // Start with full alpha
+    
+    // Add shield visual to player
+    this.player.setTint(0x00ffff);
+  }
+
+  private updateShield(delta: number) {
+    if (this.isInvincible) {
+      this.shieldTimer -= delta;
+      
+      // Calculate shield intensity based on remaining time
+      const intensity = this.shieldTimer / 7000; // Goes from 1 to 0
+      
+      // Update shield effect position and intensity
+      this.shieldEffect.setPosition(this.player.x, this.player.y);
+      this.shieldEffect.setAlpha(0.6 * intensity); // Fade out the shield effect
+      
+      // Update player tint intensity
+      const tintIntensity = Math.floor(255 * intensity);
+      const tint = Phaser.Display.Color.GetColor(0, tintIntensity, tintIntensity);
+      this.player.setTint(tint);
+      
+      if (this.shieldTimer <= 0) {
+        this.isInvincible = false;
+        this.shieldEffect.stop();
+        this.player.clearTint();
+      }
+    }
+  }
+
+  private spawnPowerUp() {
+    if (this.gameOver || !this.isGameStarted) return;
+
+    // Reduce spawn chance to 0.01% (from 0.1%)
+    if (Phaser.Math.Between(1, 10000) <= 1) {
+      const lane = Phaser.Math.Between(0, 2);
+      const powerUp = this.powerUps.create(800, this.lanes[lane], 'shield') as Phaser.Physics.Arcade.Sprite;
+      powerUp.setData('type', 'shield');
+      powerUp.setVelocityX(-this.speed);
+    }
+  }
+
+  private updateCombo(correct: boolean) {
+    if (correct) {
+      this.consecutiveCorrect++;
+      this.updateComboMultiplier();
+      this.updateComboText();
+    } else {
+      this.consecutiveCorrect = 0;
+      this.comboMultiplier = 1;
+      this.comboText.setText('');
+    }
+  }
+
+  private updateComboMultiplier() {
+    if (this.consecutiveCorrect >= 50) {
+      this.comboMultiplier = 20;
+      this.hugeFireParticles.explode();
+    } else if (this.consecutiveCorrect >= 25) {
+      this.comboMultiplier = 10;
+      this.bigFireParticles.explode();
+    } else if (this.consecutiveCorrect >= 15) {
+      this.comboMultiplier = 5;
+      this.mediumFireParticles.explode();
+    } else if (this.consecutiveCorrect >= 8) {
+      this.comboMultiplier = 2;
+      this.smallFireParticles.explode();
+    } else if (this.consecutiveCorrect >= 3) {
+      this.comboMultiplier = 1.5;
+      this.sparkParticles.explode();
+    }
+  }
+
+  private updateComboText() {
+    if (this.consecutiveCorrect >= 3) {
+      this.comboText.setText(`Combo: ${this.consecutiveCorrect}x (${this.comboMultiplier}x multiplier)`);
+    } else {
+      this.comboText.setText('');
+    }
+  }
+
+  private createScorePopup(x: number, y: number, score: number) {
+    const popup = this.add.text(x, y, `+${score}`, {
+      fontSize: '24px',
+      color: '#00ff00',
+      stroke: '#000000',
+      strokeThickness: 4
+    }).setOrigin(0.5);
+
+    this.scorePopups.push(popup);
+
+    // Animate the popup
+    this.tweens.add({
+      targets: popup,
+      y: y - 50,
+      alpha: 0,
+      duration: 1000,
+      onComplete: () => {
+        popup.destroy();
+        this.scorePopups = this.scorePopups.filter(p => p !== popup);
+      }
+    });
+  }
+
+  private spawnSpaceship() {
+    if (this.gameOver || !this.isGameStarted) return;
+
+    // Reduce spawn chance to 0.02% (from 0.2%)
+    if (Phaser.Math.Between(1, 10000) <= 2) {
+      // Randomly choose spawn position and direction
+      const fromTop = Phaser.Math.Between(0, 1) === 1;
+      const x = fromTop ? Phaser.Math.Between(-50, 850) : -50;
+      const y = fromTop ? -50 : Phaser.Math.Between(50, 550);
+      const angle = fromTop ? Phaser.Math.Between(45, 135) : Phaser.Math.Between(-45, 45);
+      
+      // Create spaceship with physics
+      const spaceship = this.spaceships.create(x, y, 'spaceship') as Phaser.Physics.Arcade.Sprite;
+      spaceship.setAngle(angle);
+      spaceship.setAlpha(0.8);
+      
+      // Set velocity based on angle
+      const speed = Phaser.Math.Between(100, 200);
+      const radians = Phaser.Math.DegToRad(angle);
+      spaceship.setVelocityX(Math.cos(radians) * speed);
+      spaceship.setVelocityY(Math.sin(radians) * speed);
+      
+      // Add trail effect
+      const trail = this.add.particles(0, 0, 'particle', {
+        follow: spaceship,
+        scale: { start: 0.3, end: 0 },
+        alpha: { start: 0.4, end: 0 },
+        speed: { min: 20, max: 40 },
+        lifespan: 600,
+        quantity: 1,
+        blendMode: 'ADD',
+        tint: [0x00ffff, 0x0088ff]
+      });
+      
+      this.activeTrails.push(trail);
+      
+      // Destroy spaceship and trail when off screen
+      this.time.delayedCall(5000, () => {
+        const index = this.activeTrails.indexOf(trail);
+        if (index > -1) {
+          this.activeTrails.splice(index, 1);
+        }
+        trail.destroy();
+        spaceship.destroy();
+      });
     }
   }
 
@@ -294,11 +681,20 @@ export class Game extends Phaser.Scene {
     if (!this.player) return;
     if (!this.isGameStarted || this.gameOver) return;
 
+    // Update shield
+    this.updateShield(delta);
+
+    // Spawn power-ups
+    this.spawnPowerUp();
+    
+    // Spawn spaceships
+    this.spawnSpaceship();
+
     // Increase speed based on score (increase base speed by 35%)
-    this.speed = 135 + Math.floor(this.score / 50) * 13.5; // Increase speed by 13.5 every 50 points
+    this.speed = 135 + Math.floor(this.score / 50) * 13.5;
 
     // Update player position based on speed
-    this.player.y = this.lanes[this.currentLane]; // Ensure player sticks to the current lane
+    this.player.y = this.lanes[this.currentLane];
 
     // Handle lane changes with cooldown
     if (this.canSwitchLane) {
@@ -307,20 +703,20 @@ export class Game extends Phaser.Scene {
         this.player.y = this.lanes[this.currentLane];
         this.canSwitchLane = false;
         // Add directional blur effect
-        this.player.setTint(0x00ff00);
+        this.player.setTint(this.isInvincible ? 0x00ffff : 0x00ff00);
         this.time.delayedCall(this.LANE_SWITCH_COOLDOWN, () => {
           this.canSwitchLane = true;
-          this.player.clearTint();
+          this.player.setTint(this.isInvincible ? 0x00ffff : 0xffffff);
         });
       } else if (this.cursors?.down.isDown && this.currentLane < 2) {
         this.currentLane++;
         this.player.y = this.lanes[this.currentLane];
         this.canSwitchLane = false;
         // Add directional blur effect
-        this.player.setTint(0x00ff00);
+        this.player.setTint(this.isInvincible ? 0x00ffff : 0x00ff00);
         this.time.delayedCall(this.LANE_SWITCH_COOLDOWN, () => {
           this.canSwitchLane = true;
-          this.player.clearTint();
+          this.player.setTint(this.isInvincible ? 0x00ffff : 0xffffff);
         });
       }
     }
@@ -336,7 +732,18 @@ export class Game extends Phaser.Scene {
         if (text) text.destroy();
         obstacle.destroy();
       }
-      // Do NOT set obstacle.y, angle, or tint here
+    });
+
+    // Check if we need to spawn new obstacles
+    if (this.obstacles.getChildren().length === 0) {
+      this.spawnNewProblem();
+    }
+
+    // Destroy off-screen power-ups
+    this.powerUps.getChildren().forEach((powerUp: any) => {
+      if (powerUp.x < -50) {
+        powerUp.destroy();
+      }
     });
 
     // Handle left/right movement with acceleration
@@ -371,11 +778,5 @@ export class Game extends Phaser.Scene {
     // Clamp playerX to screen bounds
     this.playerX = Phaser.Math.Clamp(this.playerX, 50, 750);
     this.player.x = this.playerX;
-
-    // Animate only cargo boxes
-    this.cargoBoxes.forEach((box, i) => {
-      box.y += Math.sin(time / 600 + i) * 0.3;
-      box.angle = Math.sin(time / 900 + i) * 2;
-    });
   }
 } 
