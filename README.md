@@ -1,56 +1,29 @@
 # Math Runner
 
-An endless runner game that combines math problems with fast-paced gameplay. Players must solve math problems by choosing the correct path while avoiding obstacles.
+A math-based endless runner game built with Phaser 3 and TypeScript.
 
-## Features
+## Setup
 
-- Three-lane endless runner gameplay
-- Math problem solving integrated into gameplay
-- Increasing difficulty
-- Score tracking
-- Modern, dystopian highway theme
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- npm (v6 or higher)
-
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/abdullahsaghirahmad/math-runner.git
-cd math-runner
-```
-
-2. Install dependencies:
+1. Install dependencies:
 ```bash
 npm install
 ```
 
-3. Start the development server:
+2. Start the development server:
 ```bash
 npm start
 ```
 
-4. Open your browser and navigate to `http://localhost:8080`
+3. Open your browser and navigate to `http://localhost:8080`
 
-## How to Play
+## Controls
 
-- Use UP/DOWN arrow keys to change lanes
-- Choose the lane with the correct answer to the math problem
-- Avoid incorrect answers to stay alive
-- Score points by correctly solving math problems
+- Use arrow keys to move the player
+- Collect math problems and solve them to progress
+- Avoid obstacles and enemies
 
-## Technologies Used
+## Development
 
-- TypeScript
-- Phaser 3
-- Webpack
-- Node.js
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details. 
+- Source code is in the `src` directory
+- Assets are in the `src/assets` directory
+- Build the production version with `npm run build` 
